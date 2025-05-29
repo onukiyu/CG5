@@ -4,12 +4,16 @@
 #include <cassert>          // assert
 
 #include <dxcapi.h>
-#pragma comment(lib, "dxcpiler.lib")
+#pragma comment(lib, "dxcompiler.lib")
 
 
 // コンパイル済みのシェーダーデータを返す　　※未コンパイルの場合は nullptr となる
 ID3DBlob* Shader::GetBlob() { 
 	return blob_; 
+}
+
+IDxcBlob* Shader::GetDxcBlob() { 
+	return dxcBlob_; 
 }
 
 // コンストラクタ
@@ -21,6 +25,10 @@ Shader::~Shader() {
 	if (blob_ != nullptr) {
 		blob_->Release();
 		blob_ = nullptr;
+	}
+	if (dxcBlob_ != nullptr) {
+		dxcBlob_->Release();
+		dxcBlob_ = nullptr;
 	}
 }
 
@@ -56,7 +64,7 @@ void Shader::Load(const std::wstring& filePath, const std::wstring& shaderModel)
 // ※外部コンパイル版   シェーダーモデル　6.0以上で利用する
 void Shader::LoadDxc(const std::wstring& filePath, const std::wstring& shaderModel) {
 	// DXC(DirectX Shader Compiler)を初期化
-	static IDxcUtils* dxcUtils;
+	static IDxcUtils* dxcUtils = nullptr;
 	static IDxcCompiler3* dxcCompiler = nullptr;
 	static IDxcIncludeHandler* includeHandler = nullptr;
 
@@ -69,7 +77,7 @@ void Shader::LoadDxc(const std::wstring& filePath, const std::wstring& shaderMod
 	}
 
 	if (dxcCompiler == nullptr) {
-		hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcCompiler));
+		hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
 		assert(SUCCEEDED(hr)); // うまくいかなかったときは起動できない
 	}
 
@@ -115,6 +123,24 @@ void Shader::LoadDxc(const std::wstring& filePath, const std::wstring& shaderMod
 	assert(SUCCEEDED(hr));
 
 	// 3. 警告・エラーがでていないか確認する
-	P23
+	IDxcBlobUtf8* shaderError = nullptr;
+	IDxcBlobWide* nameBlob = nullptr;
+	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), &nameBlob);
+	if (shaderError != nullptr && shaderError->GetStringLength() != 0) {
+		OutputDebugStringA(shaderError->GetStringPointer());
+		assert(false);
+	}
+
+	// 4. Compile結果を受け取る
+	IDxcBlob* shaderBlob = nullptr;
+	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), &nameBlob);
+	assert(SUCCEEDED(hr));
+
+	// もう使わないリソースを解放
+	shaderSource->Release();
+	shaderResult->Release();
+
+	// 実行用のバイナリを取っておく
+	dxcBlob_ = shaderBlob;
 }
 
