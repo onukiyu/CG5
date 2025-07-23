@@ -2,6 +2,8 @@
 #include "KamataEngine.h"
 #include "PipelineState.h"
 
+#include <cassert>
+
 using namespace KamataEngine;
 
 // RootSignatureを生成する
